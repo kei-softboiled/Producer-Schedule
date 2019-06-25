@@ -1,62 +1,134 @@
+function main(){
+  const currentDate = new Date();
+  var year = [currentDate.getFullYear()];
+  var month = [currentDate.getMonth() + 1];
+  if (month[0] != 12){
+    month[1] = month[0] + 1;
+    year[1] = year[0];
+  } else {
+    month[1] = 1;
+    year[1] = year[0] + 1;
+  }
 
-function myFunction () {
-  var currentDate = new Date();
-  var year = currentDate.getFullYear();
-  var month = currentDate.getMonth() + 1;
-  var url = 'https://idolmaster.jp/schedule/?ey=' + year + '&em=' + month;
+  const html = [fetchSchedule(year[0], month[0]),
+              fetchSchedule(year[1], month[1])
+             ];
   
-  var html = UrlFetchApp.fetch(url).getContentText();
-  
-  var spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = spreadSheet.getSheetByName(year + '.' + month);  
-  if (sheet == null){
-    spreadSheet.insertSheet(year + '.' + month, 0);
-    sheet = spreadSheet.getSheetByName(year + '.' + month);
-  }    
-  var cache = sheet.getDataRange().getValues();
+  const productions =[
+    '765',
+    'シンデレラ',
+    'ミリオン',
+    'SideM',
+    'シャイニー'
+  ];
+  const spreadSheet = SpreadsheetApp.getActiveSpreadsheet();
+  const produce = setProductions(spreadSheet, productions);
 
-  var eventTabRegexp = new RegExp(/<tr.+<\/tr>/g);
-  var eventTab = html.match(eventTabRegexp);
-  var dayRegexp = new RegExp(/img_days_[0-3][0-9]\.jpg/);
-  var titleRegexp = new RegExp(/_blank">[^<]+<\/a>/g);
-  var linkRegexp = new RegExp(/<a href="[^"]+"/g);
-  var productionRegexp = new RegExp(/height="36" alt="[^"]+"/g);
+  const eventTabRegexp = new RegExp(/<tr.+<\/tr>/g);
+  const dayRegexp = new RegExp(/img_days_[0-3][0-9]\.jpg/);
+  const timeRegexp = new RegExp(/<td class="time2">[^<]+<\/td>/g);
+  const titleRegexp = new RegExp(/_blank">[^<]+<\/a>/g);
+  const linkRegexp = new RegExp(/<a href="[^"]+"/g);
+  const productionRegexp = new RegExp(/height="36" alt="[^"]+"/g);
   
-
-  
-  eventTab.forEach(function(rec){
-    var day = rec.match(dayRegexp);
-    var titles = rec.match(titleRegexp);
-    var links = rec.match(linkRegexp);
-    var productions = rec.match(productionRegexp);
+  for (var i in html){
+    var sheet = spreadSheet.getSheetByName(year[i] + '.' + month[i]);  
+    if (sheet == null){
+      sheet = spreadSheet.insertSheet(year[i] + '.' + month[i], 0);
+    }    
+    var cacheTab = sheet.getDataRange().getValues();
     
-    if (titles){
-      for (var j = 0; j < titles.length; j++){
-        var event = [
-          year + '/' + month + '/' + day[0].replace('img_days_', '').replace('.jpg', ''),
-            titles[j].replace('_blank">', '').replace('</a>', ''),
-            links[j].replace('<a href="', '').replace('"', ''),
-            productions[j].replace('height="36" alt="', '').replace('"', '')
-          ];
-        var found = false;
-        if (cache[0] != ""){
-          for (var k = 0; k < cache.length; k++){
-            var oldRec = cache[k];
-            var eventDate = new Date(event[0]);
-            if (eventDate.getTime() == oldRec[0].getTime() && event[1] == oldRec[1] && event[2] == oldRec[2] && event[3] == oldRec[3]){
-              found  = true;
-              return true;
+    var eventTab = html[i].match(eventTabRegexp);
+    
+    for (var j in eventTab){
+      var eventDays = eventTab[j].match(dayRegexp);
+      var eventTimes = eventTab[j].match(timeRegexp);
+      var eventTitles = eventTab[j].match(titleRegexp);
+      var eventLinks = eventTab[j].match(linkRegexp);
+      var eventProductions = eventTab[j].match(productionRegexp);
+      
+      if (eventTitles){
+        for (var k in eventTitles){
+          var event = [
+            year[i] + '/' + month[i] + '/' + eventDays[0].replace('img_days_', '').replace('.jpg', ''),
+              eventTimes[k].replace('<td class="time2">', '').replace('</td>', '').replace(/～$/, '').replace(/〜$/, ''), //2種類の波ダッシュが混在している
+                eventTitles[k].replace('_blank">', '').replace('</a>', ''),
+                  eventLinks[k].replace('<a href="', '').replace('"', ''),
+                    eventProductions[k].replace('height="36" alt="', '').replace('"', '')
+                  ];
+          
+          var found = false;
+          if (cacheTab[0] != ""){
+            for (var m in cacheTab){
+              var cache = cacheTab[m];
+              var eventDay = new Date(event[0]);
+              if (eventDay.getTime() == cache[0].getTime() && event[1] == cache[1] && event[2] == cache[2] && event[3] == cache[3] && event[4] == cache[4]){
+                found  = true;
+                break;
+              }
+            }
+          }
+          if (!found){
+            //createEvent();
+            if (produceCheck(event[4], produce)){
+              sheet.appendRow(event);
             }
           }
         }
-        if (!found){
-          sheet.appendRow(event);
-        }
       }
     }
-  })
-  var i = 1;
+  }
 }
+
+/*
+指定された年・月のプロデューサー予定表を取得する。
+*/
+function fetchSchedule(year, month){
+  const url = 'https://idolmaster.jp/schedule/?ey=' + year + '&em=' + month;
+  return UrlFetchApp.fetch(url).getContentText();
+}
+
+/*
+Productionsシートより、プロダクション毎のプロデュース要否を指定したレコードを取得する。
+*/
+function setProductions(spreadSheet, productions) {
+  var sheet = spreadSheet.getSheetByName('Productions');  
+  if (sheet == null){
+    sheet = createProductionsSheet(spreadSheet, productions);
+  }
+  
+  return sheet.getDataRange().getValues();
+}
+
+/*
+Productionsシートを作成する。
+プロダクションごとにプロデュース要否をダイアログにより確認し、その回答をレコードに残す。
+*/
+function createProductionsSheet(spreadSheet, productions){
+  var sheet = spreadSheet.insertSheet('Productions', 0);
+  for(var i in productions){
+    var answer = Browser.msgBox('「' + productions[i] + '」をプロデュースしますか？', Browser.Buttons.YES_NO);
+      sheet.appendRow([productions[i], answer]); 
+  }
+  return sheet;
+}
+
+/*
+イベントの出演プロダクションに、プロデュース対象プロダクションが含まれるか
+どうかを確認する。
+*/
+function produceCheck(eventProductions, produce){
+  for(var i in produce){
+    if(produce[i][1] == 'yes'){
+      if (eventProductions.indexOf(produce[i][0]) != -1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
 
 
 
