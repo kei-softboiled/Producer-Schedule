@@ -147,8 +147,8 @@ function produceCheck(eventProductions, produce){
 */
 function addEvent(event) {
   var calendar = CalendarApp.getOwnedCalendarsByName('プロデューサー予定表');
-  if (calendar[0] == ''){
-    calendar = createCalendar('プロデューサー予定表',
+  if (!calendar[0]){
+    calendar[0] = CalendarApp.createCalendar('プロデューサー予定表',
                               {timeZone: "Asia/Tokyo"})
   }
 
