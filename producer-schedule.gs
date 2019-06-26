@@ -62,10 +62,20 @@ function main(){
             for (var m in cacheTab){
               var cache = cacheTab[m];
               var eventDay = new Date(event[0]);
-              if (eventDay.getTime() == cache[0].getTime() && event[1] == cache[1] && event[2] == cache[2] && event[3] == cache[3] && event[4] == cache[4]){
-                found  = true;
-                break;
-              }
+              if (eventDay.getTime() == cache[0].getTime() && event[2] == cache[2] && event[3] == cache[3] &&  event[4] == cache[4] &&
+                function(){
+                  const toString = Object.prototype.toString;
+                  const type = toString.call(cache[1]);
+                  if (type == '[object Date]'){
+                    return event[1] == Utilities.formatDate(cache[1], "JST", "HH:mm");
+                  } else {
+                    return event[1] == cache[1];
+                  }
+                })
+                {
+                  found  = true;
+                  break;
+                }
             }
           }
           if (!found){
@@ -129,8 +139,6 @@ function produceCheck(eventProductions, produce){
   return false;
 }
 
-
-
 /*
 カレンダーに予定を追加する。
 カレンダー「プロデューサー予定表」が存在しない場合、新規作成する。
@@ -170,5 +178,6 @@ function addEvent(event) {
   }
 ;
 }
+
 
 
