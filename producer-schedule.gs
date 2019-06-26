@@ -69,9 +69,9 @@ function main(){
             }
           }
           if (!found){
-            //createEvent();
             if (produceCheck(event[4], produce)){
               sheet.appendRow(event);
+              addEvent(event);
             }
           }
         }
@@ -79,6 +79,7 @@ function main(){
     }
   }
 }
+
 
 /*
 指定された年・月のプロデューサー予定表を取得する。
@@ -130,19 +131,44 @@ function produceCheck(eventProductions, produce){
 
 
 
-
-
-
-
-function createEvents() {
-  var calendar = CalendarApp.getDefaultCalendar();
-  var values = SpreadsheetApp.getActiveSheet().getDataRange().getValues();
- 
-  for(var i = 1; i < values.length; i++){
-    var title = values[i][0];
-    var startTime = values[i][1];
-    var endTime = values[i][2];
-    
-    calendar.createEvent(title, startTime, endTime);    
+/*
+カレンダーに予定を追加する。
+カレンダー「プロデューサー予定表」が存在しない場合、新規作成する。
+開始時間がある場合、30分間の予定として登録する。
+開始時間がない場合、終日の予定として登録する。
+*/
+function addEvent(event) {
+  var calendar = CalendarApp.getOwnedCalendarsByName('プロデューサー予定表');
+  if (calendar[0] == ''){
+    calendar = createCalendar('プロデューサー予定表',
+                              {timeZone: "Asia/Tokyo"})
   }
+
+  const title = event[2];
+  const desc = event[3];
+  
+  var start = new Date(event[0]);
+  const startTime = event[1];
+  var end = new Date();
+  if (startTime.match(/[0-2][0-9]:[0-5][0-9]/)){
+    start.setHours(start.getHours() + Number(startTime.substr(0,2)));
+    start.setMinutes(start.getMinutes() + Number(startTime.substr(3,5)));
+    end = start;
+    end.setMinutes(end.getMinutes() + 30);
+    calendar[0].createEvent(
+      title,
+      start,
+      end,
+      {description: desc}
+    );
+  } else {
+    calendar[0].createAllDayEvent(
+      title,
+      start,
+      {description: desc}
+    );
+  }
+;
 }
+
+
